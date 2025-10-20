@@ -10,7 +10,6 @@ import {
   Alert,
   Modal,
   Platform,
-  FlatList,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
@@ -18,12 +17,9 @@ import { agregarGasto, obtenerGastos } from '../storage/storage';
 import { Gasto } from '../types';
 import { Ionicons } from '@expo/vector-icons';
 import Layout from '../components/Layout';
-import ScreenHeader from '../components/ScreenHeader';
-import GastoCard from '../components/GastoCard';
-import EmptyState from '../components/EmptyState';
 
-const PRIMARY_COLOR = '#6C63FF';
-const ACCENT_COLOR = '#FF6B9D';
+const PRIMARY_COLOR = '#2563EB';
+const BACKGROUND_COLOR = '#F8FAFC';
 
 export default function HomeScreen() {
   const [modalVisible, setModalVisible] = useState(false);
@@ -31,9 +27,12 @@ export default function HomeScreen() {
   const [descripcion, setDescripcion] = useState('');
   const [monto, setMonto] = useState('');
   const [pagadoPor, setPagadoPor] = useState('');
-  const [participantesInput, setParticipantesInput] = useState('');
+  const [participantesSeleccionados, setParticipantesSeleccionados] = useState<string[]>([]);
   const [fotoRecibo, setFotoRecibo] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  // Lista de participantes predefinidos
+  const participantesDisponibles = ['Juan', 'María', 'Pedro'];
 
   const cargarGastos = async () => {
     try {
@@ -53,6 +52,27 @@ export default function HomeScreen() {
     }, [])
   );
 
+  const calcularTotalMes = () => {
+    const ahora = new Date();
+    const mesActual = ahora.getMonth();
+    const añoActual = ahora.getFullYear();
+    
+    return gastos
+      .filter(gasto => {
+        const fechaGasto = new Date(gasto.fecha);
+        return fechaGasto.getMonth() === mesActual && fechaGasto.getFullYear() === añoActual;
+      })
+      .reduce((sum, g) => sum + g.monto, 0);
+  };
+
+  const toggleParticipante = (nombre: string) => {
+    if (participantesSeleccionados.includes(nombre)) {
+      setParticipantesSeleccionados(participantesSeleccionados.filter(p => p !== nombre));
+    } else {
+      setParticipantesSeleccionados([...participantesSeleccionados, nombre]);
+    }
+  };
+
   const validarFormulario = (): boolean => {
     if (!descripcion.trim()) {
       Alert.alert('Error', 'Ingresa una descripción');
@@ -63,11 +83,11 @@ export default function HomeScreen() {
       return false;
     }
     if (!pagadoPor.trim()) {
-      Alert.alert('Error', 'Ingresa quién pagó');
+      Alert.alert('Error', 'Selecciona quién pagó');
       return false;
     }
-    if (!participantesInput.trim()) {
-      Alert.alert('Error', 'Ingresa los participantes');
+    if (participantesSeleccionados.length === 0) {
+      Alert.alert('Error', 'Selecciona al menos un participante');
       return false;
     }
     if (!fotoRecibo) {
@@ -77,37 +97,14 @@ export default function HomeScreen() {
     return true;
   };
 
-  const solicitarPermisoCamara = async (): Promise<boolean> => {
+  const tomarFoto = async () => {
     if (Platform.OS !== 'web') {
       const { status } = await ImagePicker.requestCameraPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert(
-          'Permiso Denegado',
-          'Necesitamos acceso a la cámara para tomar fotos de los recibos'
-        );
-        return false;
+        Alert.alert('Permiso Denegado', 'Necesitamos acceso a la cámara');
+        return;
       }
     }
-    return true;
-  };
-
-  const solicitarPermisoGaleria = async (): Promise<boolean> => {
-    if (Platform.OS !== 'web') {
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert(
-          'Permiso Denegado',
-          'Necesitamos acceso a la galería para seleccionar fotos de los recibos'
-        );
-        return false;
-      }
-    }
-    return true;
-  };
-
-  const tomarFoto = async () => {
-    const tienePermiso = await solicitarPermisoCamara();
-    if (!tienePermiso) return;
 
     try {
       const result = await ImagePicker.launchCameraAsync({
@@ -121,14 +118,18 @@ export default function HomeScreen() {
         setFotoRecibo(result.assets[0].uri);
       }
     } catch (error) {
-      console.error('Error al tomar foto:', error);
       Alert.alert('Error', 'No se pudo tomar la foto');
     }
   };
 
   const seleccionarFoto = async () => {
-    const tienePermiso = await solicitarPermisoGaleria();
-    if (!tienePermiso) return;
+    if (Platform.OS !== 'web') {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permiso Denegado', 'Necesitamos acceso a la galería');
+        return;
+      }
+    }
 
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
@@ -142,21 +143,8 @@ export default function HomeScreen() {
         setFotoRecibo(result.assets[0].uri);
       }
     } catch (error) {
-      console.error('Error al seleccionar foto:', error);
       Alert.alert('Error', 'No se pudo seleccionar la foto');
     }
-  };
-
-  const mostrarOpcionesFoto = () => {
-    Alert.alert(
-      'Foto del Recibo',
-      'Elige una opción',
-      [
-        { text: 'Tomar Foto', onPress: tomarFoto },
-        { text: 'Seleccionar de Galería', onPress: seleccionarFoto },
-        { text: 'Cancelar', style: 'cancel' },
-      ]
-    );
   };
 
   const guardarGasto = async () => {
@@ -164,17 +152,12 @@ export default function HomeScreen() {
 
     setLoading(true);
     try {
-      const participantes = participantesInput
-        .split(',')
-        .map(p => p.trim())
-        .filter(p => p.length > 0);
-
       const nuevoGasto: Gasto = {
         id: Date.now().toString(),
         descripcion: descripcion.trim(),
         monto: parseFloat(monto),
         pagadoPor: pagadoPor.trim(),
-        participantes,
+        participantes: participantesSeleccionados,
         fotoRecibo: fotoRecibo!,
         fecha: new Date().toISOString(),
       };
@@ -196,132 +179,233 @@ export default function HomeScreen() {
     setDescripcion('');
     setMonto('');
     setPagadoPor('');
-    setParticipantesInput('');
+    setParticipantesSeleccionados([]);
     setFotoRecibo(null);
   };
 
+  const formatearMoneda = (valor: number): string => {
+    return `$${valor.toFixed(2)}`;
+  };
+
+  const formatearFecha = (fecha: string): string => {
+    const date = new Date(fecha);
+    return date.toLocaleDateString('es-ES', {
+      day: 'numeric',
+      month: 'short',
+    });
+  };
+
+  const obtenerMesActual = () => {
+    return new Date().toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
+  };
+
   return (
-    <Layout backgroundColor={PRIMARY_COLOR} headerColor={PRIMARY_COLOR}>
+    <Layout backgroundColor={BACKGROUND_COLOR} headerColor={PRIMARY_COLOR}>
       <View style={styles.container}>
-        <ScreenHeader
-          title="💰 Mis Gastos"
-          subtitle={`${gastos.length} gasto${gastos.length !== 1 ? 's' : ''} registrado${gastos.length !== 1 ? 's' : ''}`}
-          backgroundColor={PRIMARY_COLOR}
-        />
+        {/* Header con Total */}
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>Gastos Compartidos</Text>
+          <View style={styles.totalCard}>
+            <View style={styles.totalCardHeader}>
+              <Text style={styles.totalLabel}>Total gastado</Text>
+              <Ionicons name="people" size={20} color="rgba(255,255,255,0.9)" />
+            </View>
+            <Text style={styles.totalAmount}>{formatearMoneda(calcularTotalMes())}</Text>
+            <Text style={styles.totalMonth}>{obtenerMesActual()}</Text>
+          </View>
+        </View>
 
-        {gastos.length === 0 ? (
-          <EmptyState
-            icon="wallet-outline"
-            title="No hay gastos registrados"
-            subtitle="Comienza agregando tu primer gasto"
-            iconColor="rgba(255, 255, 255, 0.5)"
-            backgroundColor={PRIMARY_COLOR}
-          />
-        ) : (
-          <FlatList
-            data={gastos}
-            renderItem={({ item }) => <GastoCard gasto={item} accentColor={PRIMARY_COLOR} />}
-            keyExtractor={(item) => item.id}
-            contentContainerStyle={styles.listContent}
+        {/* Lista de Gastos */}
+        <View style={styles.content}>
+          <Text style={styles.sectionTitle}>Gastos</Text>
+          
+          <ScrollView 
+            style={styles.gastosList}
             showsVerticalScrollIndicator={false}
-          />
-        )}
+            contentContainerStyle={styles.gastosListContent}
+          >
+            {gastos.length === 0 ? (
+              <View style={styles.emptyState}>
+                <Ionicons name="receipt-outline" size={60} color="#CBD5E1" />
+                <Text style={styles.emptyText}>No hay gastos registrados</Text>
+              </View>
+            ) : (
+              gastos.map((gasto) => (
+                <View key={gasto.id} style={styles.gastoCard}>
+                  <View style={styles.gastoInfo}>
+                    <View style={styles.gastoHeader}>
+                      <Text style={styles.gastoDescripcion}>{gasto.descripcion}</Text>
+                      <Text style={styles.gastoMonto}>{formatearMoneda(gasto.monto)}</Text>
+                    </View>
+                    <View style={styles.gastoMeta}>
+                      <Text style={styles.gastoPagador}>Pagado por {gasto.pagadoPor}</Text>
+                      <Text style={styles.gastoFecha}>{formatearFecha(gasto.fecha)}</Text>
+                    </View>
+                    <View style={styles.participantesBadges}>
+                      {gasto.participantes.map((p, idx) => (
+                        <View key={idx} style={styles.participanteBadge}>
+                          <Text style={styles.participanteInicial}>{p.charAt(0)}</Text>
+                        </View>
+                      ))}
+                      <View style={styles.verificadoBadge}>
+                        <Ionicons name="checkmark-circle" size={14} color="#10B981" />
+                        <Text style={styles.verificadoText}>Recibo verificado</Text>
+                      </View>
+                    </View>
+                  </View>
+                </View>
+              ))
+            )}
+          </ScrollView>
+        </View>
 
+        {/* Botón Flotante */}
         <TouchableOpacity
-          style={[styles.addButton, { backgroundColor: ACCENT_COLOR }]}
+          style={styles.addButton}
           onPress={() => setModalVisible(true)}
         >
-          <Ionicons name="add" size={32} color="#FFF" />
+          <Ionicons name="add" size={28} color="#FFF" />
         </TouchableOpacity>
 
+        {/* Modal Nuevo Gasto */}
         <Modal
           animationType="slide"
           transparent={false}
           visible={modalVisible}
           onRequestClose={() => setModalVisible(false)}
         >
-          <Layout backgroundColor="#FFF">
-            <View style={styles.modalContainer}>
-              <View style={styles.modalHeader}>
-                <TouchableOpacity onPress={() => setModalVisible(false)}>
-                  <Ionicons name="close" size={28} color={PRIMARY_COLOR} />
-                </TouchableOpacity>
-                <Text style={[styles.modalTitle, { color: PRIMARY_COLOR }]}>Nuevo Gasto</Text>
-                <View style={{ width: 28 }} />
-              </View>
+          <View style={styles.modalContainer}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Nuevo Gasto</Text>
+              <TouchableOpacity onPress={() => setModalVisible(false)}>
+                <Ionicons name="close" size={28} color="#64748B" />
+              </TouchableOpacity>
+            </View>
 
-              <ScrollView style={styles.modalContent} showsVerticalScrollIndicator={false}>
-                <Text style={styles.label}>Descripción *</Text>
-                <TextInput
-                  style={styles.input}
-                  value={descripcion}
-                  onChangeText={setDescripcion}
-                  placeholder="Ej: Cena en restaurante"
-                  placeholderTextColor="#999"
-                />
+            <ScrollView style={styles.modalContent} showsVerticalScrollIndicator={false}>
+              <Text style={styles.label}>Descripción</Text>
+              <TextInput
+                style={styles.input}
+                value={descripcion}
+                onChangeText={setDescripcion}
+                placeholder="Ej: Cena con amigos"
+                placeholderTextColor="#94A3B8"
+              />
 
-                <Text style={styles.label}>Monto ($) *</Text>
+              <Text style={styles.label}>Monto</Text>
+              <View style={styles.montoInputContainer}>
+                <Text style={styles.montoPrefix}>$</Text>
                 <TextInput
-                  style={styles.input}
+                  style={styles.montoInput}
                   value={monto}
                   onChangeText={setMonto}
                   placeholder="0.00"
-                  placeholderTextColor="#999"
+                  placeholderTextColor="#94A3B8"
                   keyboardType="decimal-pad"
                 />
+              </View>
 
-                <Text style={styles.label}>Pagado por *</Text>
-                <TextInput
-                  style={styles.input}
-                  value={pagadoPor}
-                  onChangeText={setPagadoPor}
-                  placeholder="Nombre de quien pagó"
-                  placeholderTextColor="#999"
-                />
+              <Text style={styles.label}>¿Quién pagó?</Text>
+              <View style={styles.pagadorSelector}>
+                {participantesDisponibles.map((nombre) => (
+                  <TouchableOpacity
+                    key={nombre}
+                    style={[
+                      styles.pagadorOption,
+                      pagadoPor === nombre && styles.pagadorOptionSelected
+                    ]}
+                    onPress={() => setPagadoPor(nombre)}
+                  >
+                    <Text style={[
+                      styles.pagadorOptionText,
+                      pagadoPor === nombre && styles.pagadorOptionTextSelected
+                    ]}>
+                      {nombre}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
 
-                <Text style={styles.label}>Participantes * (separados por coma)</Text>
-                <TextInput
-                  style={[styles.input, styles.inputMultiline]}
-                  value={participantesInput}
-                  onChangeText={setParticipantesInput}
-                  placeholder="Ej: Juan, María, Pedro"
-                  placeholderTextColor="#999"
-                  multiline
-                />
+              <Text style={styles.label}>Participantes</Text>
+              <View style={styles.participantesSelector}>
+                {participantesDisponibles.map((nombre) => (
+                  <TouchableOpacity
+                    key={nombre}
+                    style={[
+                      styles.participanteChip,
+                      participantesSeleccionados.includes(nombre) && styles.participanteChipSelected
+                    ]}
+                    onPress={() => toggleParticipante(nombre)}
+                  >
+                    <Text style={[
+                      styles.participanteChipText,
+                      participantesSeleccionados.includes(nombre) && styles.participanteChipTextSelected
+                    ]}>
+                      {nombre}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
 
-                <Text style={styles.label}>Foto del Recibo *</Text>
-                <TouchableOpacity
-                  style={styles.photoButton}
-                  onPress={mostrarOpcionesFoto}
-                >
-                  {fotoRecibo ? (
+              <View style={styles.fotoSection}>
+                <View style={styles.fotoHeader}>
+                  <Text style={styles.label}>Foto del Recibo</Text>
+                  <View style={styles.obligatorioBadge}>
+                    <Text style={styles.obligatorioText}>* Obligatorio</Text>
+                  </View>
+                </View>
+
+                {fotoRecibo ? (
+                  <TouchableOpacity onPress={() => Alert.alert(
+                    'Foto del Recibo',
+                    'Elige una opción',
+                    [
+                      { text: 'Tomar nueva foto', onPress: tomarFoto },
+                      { text: 'Seleccionar de galería', onPress: seleccionarFoto },
+                      { text: 'Cancelar', style: 'cancel' },
+                    ]
+                  )}>
                     <Image source={{ uri: fotoRecibo }} style={styles.photoPreview} />
-                  ) : (
-                    <View style={styles.photoPlaceholder}>
-                      <Ionicons name="camera" size={40} color={PRIMARY_COLOR} />
-                      <Text style={[styles.photoPlaceholderText, { color: PRIMARY_COLOR }]}>
-                        Toca para agregar foto
-                      </Text>
-                    </View>
-                  )}
-                </TouchableOpacity>
+                  </TouchableOpacity>
+                ) : (
+                  <TouchableOpacity
+                    style={styles.photoPlaceholder}
+                    onPress={() => Alert.alert(
+                      'Foto del Recibo',
+                      'Elige una opción',
+                      [
+                        { text: 'Tomar Foto', onPress: tomarFoto },
+                        { text: 'Seleccionar de Galería', onPress: seleccionarFoto },
+                        { text: 'Cancelar', style: 'cancel' },
+                      ]
+                    )}
+                  >
+                    <Ionicons name="camera-outline" size={48} color="#94A3B8" />
+                    <Text style={styles.photoPlaceholderTitle}>Tomar Foto del Recibo</Text>
+                    <Text style={styles.photoPlaceholderSubtitle}>Es necesario para registrar el gasto</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
 
-                <TouchableOpacity
-                  style={[
-                    styles.saveButton, 
-                    { backgroundColor: PRIMARY_COLOR },
-                    loading && styles.saveButtonDisabled
-                  ]}
-                  onPress={guardarGasto}
-                  disabled={loading}
-                >
-                  <Text style={styles.saveButtonText}>
-                    {loading ? 'Guardando...' : 'Guardar Gasto'}
-                  </Text>
-                </TouchableOpacity>
-              </ScrollView>
-            </View>
-          </Layout>
+              <TouchableOpacity
+                style={[styles.saveButton, loading && styles.saveButtonDisabled]}
+                onPress={guardarGasto}
+                disabled={loading}
+              >
+                <Ionicons name="camera" size={20} color="#FFF" style={{ marginRight: 8 }} />
+                <Text style={styles.saveButtonText}>
+                  {loading ? 'Guardando...' : 'Guardar Gasto con Recibo'}
+                </Text>
+              </TouchableOpacity>
+
+              <View style={styles.modalFooter}>
+                <Ionicons name="information-circle-outline" size={16} color="#64748B" />
+                <Text style={styles.modalFooterText}>
+                  Todos los gastos deben incluir foto del recibo
+                </Text>
+              </View>
+            </ScrollView>
+          </View>
         </Modal>
       </View>
     </Layout>
@@ -332,110 +416,350 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  listContent: {
-    padding: 15,
+  header: {
+    backgroundColor: PRIMARY_COLOR,
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 30,
+  },
+  headerTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#FFF',
+    marginBottom: 16,
+  },
+  totalCard: {
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    borderRadius: 16,
+    padding: 20,
+    backdropFilter: 'blur(10px)',
+  },
+  totalCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  totalLabel: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.9)',
+  },
+  totalAmount: {
+    fontSize: 36,
+    fontWeight: '700',
+    color: '#FFF',
+    marginBottom: 4,
+  },
+  totalMonth: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.8)',
+    textTransform: 'capitalize',
+  },
+  content: {
+    flex: 1,
+    paddingHorizontal: 20,
+    paddingTop: 20,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1E293B',
+    marginBottom: 16,
+  },
+  gastosList: {
+    flex: 1,
+  },
+  gastosListContent: {
     paddingBottom: 100,
+  },
+  emptyState: {
+    alignItems: 'center',
+    paddingTop: 60,
+  },
+  emptyText: {
+    fontSize: 16,
+    color: '#94A3B8',
+    marginTop: 16,
+  },
+  gastoCard: {
+    backgroundColor: '#FFF',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  gastoInfo: {
+    flex: 1,
+  },
+  gastoHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 8,
+  },
+  gastoDescripcion: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1E293B',
+    flex: 1,
+  },
+  gastoMonto: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1E293B',
+    marginLeft: 12,
+  },
+  gastoMeta: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  gastoPagador: {
+    fontSize: 13,
+    color: '#64748B',
+  },
+  gastoFecha: {
+    fontSize: 13,
+    color: '#94A3B8',
+  },
+  participantesBadges: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  participanteBadge: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: PRIMARY_COLOR,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  participanteInicial: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#FFF',
+  },
+  verificadoBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginLeft: 8,
+  },
+  verificadoText: {
+    fontSize: 12,
+    color: '#10B981',
   },
   addButton: {
     position: 'absolute',
     bottom: 20,
     right: 20,
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: PRIMARY_COLOR,
     justifyContent: 'center',
     alignItems: 'center',
-    elevation: 6,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
+    shadowColor: PRIMARY_COLOR,
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
-    shadowRadius: 5,
+    shadowRadius: 8,
+    elevation: 8,
   },
   modalContainer: {
     flex: 1,
+    backgroundColor: '#FFF',
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 20,
+    paddingHorizontal: 20,
+    paddingTop: 60,
+    paddingBottom: 20,
     borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
+    borderBottomColor: '#E2E8F0',
   },
   modalTitle: {
     fontSize: 22,
-    fontWeight: 'bold',
+    fontWeight: '700',
+    color: '#1E293B',
   },
   modalContent: {
     flex: 1,
-    padding: 20,
+    paddingHorizontal: 20,
+    paddingTop: 24,
   },
   label: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '600',
-    color: '#333',
+    color: '#475569',
     marginBottom: 8,
-    marginTop: 15,
+    marginTop: 16,
   },
   input: {
-    borderWidth: 2,
-    borderColor: '#E8E6FF',
+    backgroundColor: '#F8FAFC',
     borderRadius: 12,
-    padding: 14,
+    padding: 16,
     fontSize: 16,
-    backgroundColor: '#FFF',
-    color: '#333',
+    color: '#1E293B',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
   },
-  inputMultiline: {
-    minHeight: 60,
-    textAlignVertical: 'top',
-  },
-  photoButton: {
-    marginTop: 10,
-    marginBottom: 20,
+  montoInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
     borderRadius: 12,
-    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    paddingLeft: 16,
+  },
+  montoPrefix: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#64748B',
+    marginRight: 8,
+  },
+  montoInput: {
+    flex: 1,
+    padding: 16,
+    paddingLeft: 0,
+    fontSize: 16,
+    color: '#1E293B',
+  },
+  pagadorSelector: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  pagadorOption: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    backgroundColor: '#F8FAFC',
+    borderWidth: 2,
+    borderColor: '#E2E8F0',
+    alignItems: 'center',
+  },
+  pagadorOptionSelected: {
+    backgroundColor: PRIMARY_COLOR,
+    borderColor: PRIMARY_COLOR,
+  },
+  pagadorOptionText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#64748B',
+  },
+  pagadorOptionTextSelected: {
+    color: '#FFF',
+  },
+  participantesSelector: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  participanteChip: {
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 20,
+    backgroundColor: '#DBEAFE',
+    borderWidth: 2,
+    borderColor: '#DBEAFE',
+  },
+  participanteChipSelected: {
+    backgroundColor: '#BFDBFE',
+    borderColor: PRIMARY_COLOR,
+  },
+  participanteChipText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: PRIMARY_COLOR,
+  },
+  participanteChipTextSelected: {
+    color: PRIMARY_COLOR,
+  },
+  fotoSection: {
+    marginTop: 8,
+  },
+  fotoHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  obligatorioBadge: {
+    backgroundColor: '#FEE2E2',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  obligatorioText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#DC2626',
+  },
+  photoPlaceholder: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    padding: 40,
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#E2E8F0',
+    borderStyle: 'dashed',
+  },
+  photoPlaceholderTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#475569',
+    marginTop: 12,
+  },
+  photoPlaceholderSubtitle: {
+    fontSize: 13,
+    color: '#94A3B8',
+    marginTop: 4,
   },
   photoPreview: {
     width: '100%',
     height: 200,
-    resizeMode: 'cover',
     borderRadius: 12,
-  },
-  photoPlaceholder: {
-    width: '100%',
-    height: 200,
-    backgroundColor: '#F8F7FF',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#E8E6FF',
-    borderStyle: 'dashed',
-    borderRadius: 12,
-  },
-  photoPlaceholderText: {
-    marginTop: 10,
-    fontSize: 14,
-    fontWeight: '500',
   },
   saveButton: {
+    backgroundColor: PRIMARY_COLOR,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
     padding: 18,
     borderRadius: 12,
-    alignItems: 'center',
-    marginTop: 20,
-    marginBottom: 40,
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
+    marginTop: 32,
+    shadowColor: PRIMARY_COLOR,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
   },
   saveButtonDisabled: {
     opacity: 0.6,
   },
   saveButtonText: {
     color: '#FFF',
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '700',
+  },
+  modalFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 24,
+    marginBottom: 40,
+  },
+  modalFooterText: {
+    fontSize: 12,
+    color: '#64748B',
   },
 });

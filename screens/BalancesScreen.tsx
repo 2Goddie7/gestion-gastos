@@ -5,17 +5,16 @@ import {
   StyleSheet,
   ScrollView,
   RefreshControl,
+  TouchableOpacity,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { obtenerGastos } from '../storage/storage';
 import { Gasto, Balance, Deuda } from '../types';
 import { Ionicons } from '@expo/vector-icons';
 import Layout from '../components/Layout';
-import ScreenHeader from '../components/ScreenHeader';
-import EmptyState from '../components/EmptyState';
 
-const PRIMARY_COLOR = '#FF6B9D';
-const SECONDARY_COLOR = '#F5F7FA';
+const PRIMARY_COLOR = '#9333EA';
+const BACKGROUND_COLOR = '#F8FAFC';
 
 export default function BalancesScreen() {
   const [gastos, setGastos] = useState<Gasto[]>([]);
@@ -124,122 +123,114 @@ export default function BalancesScreen() {
   };
 
   const formatearMoneda = (valor: number): string => {
-    return `${valor.toFixed(2)}`;
+    return `${valor.toFixed(0)}`;
   };
 
   if (gastos.length === 0) {
     return (
-      <Layout backgroundColor={SECONDARY_COLOR} headerColor={PRIMARY_COLOR}>
-        <ScreenHeader
-          title="Balance General"
-          subtitle="Calcula quién debe a quién"
-          backgroundColor={PRIMARY_COLOR}
-        />
-        <EmptyState
-          icon="calculator-outline"
-          title="No hay gastos registrados"
-          subtitle="Agrega gastos desde la pantalla de Inicio"
-          iconColor="#CCC"
-        />
+      <Layout backgroundColor={BACKGROUND_COLOR} headerColor={PRIMARY_COLOR}>
+        <View style={styles.container}>
+          <View style={styles.header}>
+            <Text style={styles.headerTitle}>Balance de Cuentas</Text>
+            <Text style={styles.headerSubtitle}>¿Quién debe a quién?</Text>
+          </View>
+          <View style={styles.emptyState}>
+            <Ionicons name="calculator-outline" size={80} color="#CBD5E1" />
+            <Text style={styles.emptyText}>No hay gastos registrados</Text>
+            <Text style={styles.emptySubtext}>Agrega gastos para ver el balance</Text>
+          </View>
+        </View>
       </Layout>
     );
   }
 
   return (
-    <Layout backgroundColor={SECONDARY_COLOR} headerColor={PRIMARY_COLOR}>
+    <Layout backgroundColor={BACKGROUND_COLOR} headerColor={PRIMARY_COLOR}>
       <ScrollView
         style={styles.container}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[PRIMARY_COLOR]} />
         }
       >
-        <ScreenHeader
-          title="Balance General"
-          subtitle={`Total de gastos: ${formatearMoneda(gastos.reduce((sum, g) => sum + g.monto, 0))}`}
-          backgroundColor={PRIMARY_COLOR}
-        />
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>
-            <Ionicons name="swap-horizontal" size={20} /> Resumen de Deudas
-          </Text>
-          {deudas.length > 0 ? (
-            deudas.map((deuda, index) => (
-              <View key={index} style={styles.deudaCard}>
-                <View style={styles.deudaHeader}>
-                  <Ionicons name="person" size={20} color="#E74C3C" />
-                  <Text style={styles.deudorText}>{deuda.deudor}</Text>
-                </View>
-                <View style={styles.deudaArrow}>
-                  <Ionicons name="arrow-forward" size={24} color="#999" />
-                  <Text style={[styles.montoDeuda, { color: PRIMARY_COLOR }]}>
-                    {formatearMoneda(deuda.monto)}
-                  </Text>
-                </View>
-                <View style={styles.deudaHeader}>
-                  <Ionicons name="person" size={20} color="#27AE60" />
-                  <Text style={styles.acreedorText}>{deuda.acreedor}</Text>
-                </View>
-              </View>
-            ))
-          ) : (
-            <Text style={styles.noDeudas}>✓ Todas las cuentas están saldadas</Text>
-          )}
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>Balance de Cuentas</Text>
+          <Text style={styles.headerSubtitle}>¿Quién debe a quién?</Text>
         </View>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>
-            <Ionicons name="people" size={20} /> Balance por Persona
-          </Text>
-          {balances.map((balance, index) => (
-            <View key={index} style={styles.balanceCard}>
-              <View style={styles.balanceHeader}>
-                <Ionicons
-                  name="person-circle"
-                  size={24}
-                  color={balance.total >= 0 ? '#27AE60' : '#E74C3C'}
-                />
-                <Text style={styles.personaText}>{balance.persona}</Text>
-              </View>
-
-              <View style={styles.balanceTotal}>
-                <Text
-                  style={[
-                    styles.totalText,
-                    balance.total >= 0 ? styles.positivo : styles.negativo,
-                  ]}
-                >
-                  {balance.total >= 0 ? '+' : ''}
-                  {formatearMoneda(balance.total)}
-                </Text>
-                <Text style={styles.totalLabel}>
-                  {balance.total > 0 ? 'Le deben' : balance.total < 0 ? 'Debe' : 'Saldado'}
-                </Text>
-              </View>
-
-              {Object.keys(balance.lesDeben).length > 0 && (
-                <View style={styles.detalle}>
-                  <Text style={styles.detalleTitle}>Le deben:</Text>
-                  {Object.entries(balance.lesDeben).map(([persona, monto]) => (
-                    <Text key={persona} style={styles.detalleText}>
-                      • {persona}: {formatearMoneda(monto)}
-                    </Text>
-                  ))}
-                </View>
-              )}
-
-              {Object.keys(balance.debe).length > 0 && (
-                <View style={styles.detalle}>
-                  <Text style={styles.detalleTitle}>Debe a:</Text>
-                  {Object.entries(balance.debe).map(([persona, monto]) => (
-                    <Text key={persona} style={styles.detalleText}>
-                      • {persona}: {formatearMoneda(monto)}
-                    </Text>
-                  ))}
-                </View>
-              )}
+        <View style={styles.content}>
+          {/* Resumen de Deudas */}
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Ionicons name="swap-horizontal" size={20} color="#1E293B" />
+              <Text style={styles.sectionTitle}>Resumen de Deudas</Text>
             </View>
-          ))}
+
+            {deudas.length > 0 ? (
+              deudas.map((deuda, index) => (
+                <View key={index} style={styles.deudaCard}>
+                  <View style={styles.deudaLeft}>
+                    <View style={styles.avatarDeudor}>
+                      <Text style={styles.avatarText}>{deuda.deudor.charAt(0)}</Text>
+                    </View>
+                    <View>
+                      <Text style={styles.deudorNombre}>{deuda.deudor}</Text>
+                      <Text style={styles.deudaMeta}>debe a {deuda.acreedor}</Text>
+                    </View>
+                  </View>
+                  <View style={styles.deudaRight}>
+                    <Text style={styles.deudaMonto}>{formatearMoneda(deuda.monto)}</Text>
+                    <TouchableOpacity style={styles.marcarPagadoBtn}>
+                      <Text style={styles.marcarPagadoText}>Marcar pagado</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ))
+            ) : (
+              <View style={styles.noDeudas}>
+                <Ionicons name="checkmark-circle" size={48} color="#10B981" />
+                <Text style={styles.noDeudasText}>Todas las cuentas están saldadas</Text>
+              </View>
+            )}
+          </View>
+
+          {/* Algoritmo de División */}
+          <View style={styles.algoritmoCard}>
+            <Text style={styles.algoritmoTitle}>Algoritmo de División</Text>
+            <Text style={styles.algoritmoSubtitle}>Método: Simplificación de deudas</Text>
+            <View style={styles.algoritmoDivider} />
+            {Object.values(
+              gastos.reduce((acc, gasto) => {
+                if (!acc[gasto.pagadoPor]) {
+                  acc[gasto.pagadoPor] = 0;
+                }
+                acc[gasto.pagadoPor] += gasto.monto;
+                return acc;
+              }, {} as { [key: string]: number })
+            ).length > 0 && (
+              <>
+                {Object.entries(
+                  gastos.reduce((acc, gasto) => {
+                    if (!acc[gasto.pagadoPor]) {
+                      acc[gasto.pagadoPor] = 0;
+                    }
+                    acc[gasto.pagadoPor] += gasto.monto;
+                    return acc;
+                  }, {} as { [key: string]: number })
+                ).map(([persona, total]) => (
+                  <Text key={persona} style={styles.algoritmoLine}>
+                    {persona} gastó: {formatearMoneda(total)}
+                  </Text>
+                ))}
+                <View style={styles.algoritmoDivider} />
+                <Text style={styles.algoritmoLine}>
+                  Promedio por persona: {formatearMoneda(
+                    gastos.reduce((sum, g) => sum + g.monto, 0) / 
+                    new Set(gastos.flatMap(g => [g.pagadoPor, ...g.participantes])).size
+                  )}
+                </Text>
+              </>
+            )}
+          </View>
         </View>
       </ScrollView>
     </Layout>
@@ -250,121 +241,152 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  header: {
+    backgroundColor: PRIMARY_COLOR,
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 30,
+  },
+  headerTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#FFF',
+    marginBottom: 4,
+  },
+  headerSubtitle: {
+    fontSize: 16,
+    color: 'rgba(255, 255, 255, 0.9)',
+  },
+  emptyState: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingTop: 100,
+  },
+  emptyText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#64748B',
+    marginTop: 16,
+  },
+  emptySubtext: {
+    fontSize: 14,
+    color: '#94A3B8',
+    marginTop: 8,
+  },
+  content: {
+    padding: 20,
+  },
   section: {
-    padding: 15,
+    marginBottom: 24,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 16,
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 15,
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1E293B',
   },
   deudaCard: {
     backgroundColor: '#FFF',
     borderRadius: 12,
-    padding: 15,
-    marginBottom: 10,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
+    padding: 16,
+    marginBottom: 12,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-  },
-  deudaHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  deudorText: {
-    fontSize: 16,
-    color: '#E74C3C',
-    fontWeight: '600',
-    marginLeft: 8,
-  },
-  acreedorText: {
-    fontSize: 16,
-    color: '#27AE60',
-    fontWeight: '600',
-    marginLeft: 8,
-  },
-  deudaArrow: {
-    alignItems: 'center',
-    marginHorizontal: 10,
-  },
-  montoDeuda: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginTop: 4,
-  },
-  noDeudas: {
-    fontSize: 16,
-    color: '#27AE60',
-    textAlign: 'center',
-    padding: 20,
-    backgroundColor: '#E8F8F5',
-    borderRadius: 8,
-  },
-  balanceCard: {
-    backgroundColor: '#FFF',
-    borderRadius: 12,
-    padding: 15,
-    marginBottom: 12,
-    elevation: 2,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
+    shadowOpacity: 0.05,
     shadowRadius: 2,
+    elevation: 1,
   },
-  balanceHeader: {
+  deudaLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
+    gap: 12,
+    flex: 1,
   },
-  personaText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-    marginLeft: 10,
-  },
-  balanceTotal: {
+  avatarDeudor: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#FEE2E2',
+    justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: 10,
-    borderTopWidth: 1,
-    borderBottomWidth: 1,
-    borderColor: '#EEE',
-    marginBottom: 10,
   },
-  totalText: {
-    fontSize: 28,
-    fontWeight: 'bold',
+  avatarText: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#DC2626',
   },
-  positivo: {
-    color: '#27AE60',
-  },
-  negativo: {
-    color: '#E74C3C',
-  },
-  totalLabel: {
-    fontSize: 14,
-    color: '#999',
-    marginTop: 4,
-  },
-  detalle: {
-    marginTop: 8,
-  },
-  detalleTitle: {
-    fontSize: 14,
+  deudorNombre: {
+    fontSize: 16,
     fontWeight: '600',
-    color: '#666',
-    marginBottom: 5,
+    color: '#1E293B',
   },
-  detalleText: {
+  deudaMeta: {
+    fontSize: 13,
+    color: '#64748B',
+  },
+  deudaRight: {
+    alignItems: 'flex-end',
+  },
+  deudaMonto: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#DC2626',
+    marginBottom: 4,
+  },
+  marcarPagadoBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+  },
+  marcarPagadoText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: PRIMARY_COLOR,
+  },
+  noDeudas: {
+    backgroundColor: '#F0FDF4',
+    borderRadius: 12,
+    padding: 32,
+    alignItems: 'center',
+  },
+  noDeudasText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#10B981',
+    marginTop: 12,
+  },
+  algoritmoCard: {
+    backgroundColor: '#ECFDF5',
+    borderRadius: 12,
+    padding: 20,
+  },
+  algoritmoTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1E293B',
+    marginBottom: 4,
+  },
+  algoritmoSubtitle: {
+    fontSize: 13,
+    color: '#64748B',
+    marginBottom: 16,
+  },
+  algoritmoDivider: {
+    height: 1,
+    backgroundColor: '#D1FAE5',
+    marginVertical: 12,
+  },
+  algoritmoLine: {
     fontSize: 14,
-    color: '#666',
-    marginLeft: 10,
-    marginTop: 2,
+    color: '#475569',
+    marginBottom: 8,
   },
 });

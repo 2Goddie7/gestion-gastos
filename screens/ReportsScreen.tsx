@@ -15,29 +15,18 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Print from 'expo-print';
 import { shareAsync } from 'expo-sharing';
 import Layout from '../components/Layout';
-import ScreenHeader from '../components/ScreenHeader';
-import EmptyState from '../components/EmptyState';
 
-const PRIMARY_COLOR = '#FFA500';
-const SECONDARY_COLOR = '#F5F7FA';
+const PRIMARY_COLOR = '#5B5FF9';
+const BACKGROUND_COLOR = '#F8FAFC';
 
 export default function ReportsScreen() {
   const [gastos, setGastos] = useState<Gasto[]>([]);
   const [loading, setLoading] = useState(false);
-  const [estadisticas, setEstadisticas] = useState({
-    totalGastos: 0,
-    cantidadGastos: 0,
-    promedioGasto: 0,
-    gastoMayor: 0,
-    gastoMenor: 0,
-    totalPersonas: 0,
-  });
 
   const cargarGastos = async () => {
     try {
       const gastosObtenidos = await obtenerGastos();
       setGastos(gastosObtenidos);
-      calcularEstadisticas(gastosObtenidos);
     } catch (error) {
       console.error('Error al cargar gastos:', error);
     }
@@ -49,267 +38,43 @@ export default function ReportsScreen() {
     }, [])
   );
 
-  const calcularEstadisticas = (gastos: Gasto[]) => {
-    if (gastos.length === 0) {
-      setEstadisticas({
-        totalGastos: 0,
-        cantidadGastos: 0,
-        promedioGasto: 0,
-        gastoMayor: 0,
-        gastoMenor: 0,
-        totalPersonas: 0,
-      });
-      return;
-    }
+  const calcularTotalMes = () => {
+    return gastos.reduce((sum, g) => sum + g.monto, 0);
+  };
 
-    const totalGastos = gastos.reduce((sum, g) => sum + g.monto, 0);
-    const montos = gastos.map(g => g.monto);
-    const personasSet = new Set<string>();
-    
-    gastos.forEach(g => {
-      personasSet.add(g.pagadoPor);
-      g.participantes.forEach(p => personasSet.add(p));
+  const calcularPromedioDia = () => {
+    if (gastos.length === 0) return 0;
+    const diasUnicos = new Set(gastos.map(g => new Date(g.fecha).toDateString())).size;
+    return calcularTotalMes() / Math.max(diasUnicos, 1);
+  };
+
+  const calcularGastosPorCategoria = () => {
+    const categorias: { [key: string]: number } = {
+      'Comida': 0,
+      'Restaurantes': 0,
+      'Transporte': 0,
+    };
+
+    gastos.forEach(gasto => {
+      const desc = gasto.descripcion.toLowerCase();
+      if (desc.includes('super') || desc.includes('comida')) {
+        categorias['Comida'] += gasto.monto;
+      } else if (desc.includes('restaurante') || desc.includes('cena')) {
+        categorias['Restaurantes'] += gasto.monto;
+      } else if (desc.includes('uber') || desc.includes('taxi') || desc.includes('transporte')) {
+        categorias['Transporte'] += gasto.monto;
+      }
     });
 
-    setEstadisticas({
-      totalGastos,
-      cantidadGastos: gastos.length,
-      promedioGasto: totalGastos / gastos.length,
-      gastoMayor: Math.max(...montos),
-      gastoMenor: Math.min(...montos),
-      totalPersonas: personasSet.size,
-    });
+    return categorias;
   };
 
   const formatearMoneda = (valor: number): string => {
-    return `$${valor.toFixed(2)}`;
+    return `${Math.round(valor)}`;
   };
 
-  const formatearFecha = (fecha: string): string => {
-    const date = new Date(fecha);
-    return date.toLocaleDateString('es-ES', {
-      day: '2-digit',
-      month: 'long',
-      year: 'numeric',
-    });
-  };
-
-  const generarHTML = (): string => {
-    const ahora = new Date().toLocaleDateString('es-ES', {
-      day: '2-digit',
-      month: 'long',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-
-    const balanceMap: { [persona: string]: number } = {};
-    gastos.forEach(gasto => {
-      const costoPorPersona = gasto.monto / gasto.participantes.length;
-      
-      if (!balanceMap[gasto.pagadoPor]) {
-        balanceMap[gasto.pagadoPor] = 0;
-      }
-      
-      gasto.participantes.forEach(participante => {
-        if (!balanceMap[participante]) {
-          balanceMap[participante] = 0;
-        }
-        
-        if (participante !== gasto.pagadoPor) {
-          balanceMap[participante] -= costoPorPersona;
-          balanceMap[gasto.pagadoPor] += costoPorPersona;
-        }
-      });
-    });
-
-    const gastosHTML = gastos
-      .map(
-        (gasto, index) => `
-      <tr style="${index % 2 === 0 ? 'background-color: #f9f9f9;' : ''}">
-        <td style="padding: 12px; border-bottom: 1px solid #e0e0e0;">${formatearFecha(gasto.fecha)}</td>
-        <td style="padding: 12px; border-bottom: 1px solid #e0e0e0;">${gasto.descripcion}</td>
-        <td style="padding: 12px; border-bottom: 1px solid #e0e0e0; text-align: right; font-weight: bold; color: #27AE60;">${formatearMoneda(gasto.monto)}</td>
-        <td style="padding: 12px; border-bottom: 1px solid #e0e0e0;">${gasto.pagadoPor}</td>
-        <td style="padding: 12px; border-bottom: 1px solid #e0e0e0;">${gasto.participantes.join(', ')}</td>
-      </tr>
-    `
-      )
-      .join('');
-
-    const balancesHTML = Object.entries(balanceMap)
-      .sort(([, a], [, b]) => b - a)
-      .map(
-        ([persona, balance]) => `
-      <tr>
-        <td style="padding: 12px; border-bottom: 1px solid #e0e0e0; font-weight: 600;">${persona}</td>
-        <td style="padding: 12px; border-bottom: 1px solid #e0e0e0; text-align: right; font-weight: bold; color: ${balance >= 0 ? '#27AE60' : '#E74C3C'};">
-          ${balance >= 0 ? '+' : ''}${formatearMoneda(balance)}
-        </td>
-        <td style="padding: 12px; border-bottom: 1px solid #e0e0e0;">
-          ${balance > 0 ? 'Le deben' : balance < 0 ? 'Debe' : 'Saldado'}
-        </td>
-      </tr>
-    `
-      )
-      .join('');
-
-    return `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <style>
-          body {
-            font-family: Arial, sans-serif;
-            padding: 30px;
-            color: #333;
-          }
-          .header {
-            text-align: center;
-            border-bottom: 3px solid ${PRIMARY_COLOR};
-            padding-bottom: 20px;
-            margin-bottom: 30px;
-          }
-          .header h1 {
-            color: ${PRIMARY_COLOR};
-            margin: 0 0 10px 0;
-          }
-          .header p {
-            color: #666;
-            margin: 5px 0;
-          }
-          .section {
-            margin-bottom: 30px;
-            page-break-inside: avoid;
-          }
-          .section h2 {
-            color: #333;
-            border-bottom: 2px solid #e0e0e0;
-            padding-bottom: 10px;
-            margin-bottom: 15px;
-          }
-          .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 15px;
-            margin-bottom: 20px;
-          }
-          .stat-card {
-            background-color: #f5f7fa;
-            padding: 15px;
-            border-radius: 8px;
-            text-align: center;
-          }
-          .stat-label {
-            color: #666;
-            font-size: 12px;
-            margin-bottom: 5px;
-          }
-          .stat-value {
-            color: #333;
-            font-size: 24px;
-            font-weight: bold;
-          }
-          table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 15px;
-          }
-          th {
-            background-color: ${PRIMARY_COLOR};
-            color: white;
-            padding: 12px;
-            text-align: left;
-            font-weight: 600;
-          }
-          .footer {
-            text-align: center;
-            margin-top: 40px;
-            padding-top: 20px;
-            border-top: 1px solid #e0e0e0;
-            color: #999;
-            font-size: 12px;
-          }
-        </style>
-      </head>
-      <body>
-        <div class="header">
-          <h1>📊 Reporte de Gastos Compartidos</h1>
-          <p>Generado el: ${ahora}</p>
-        </div>
-
-        <div class="section">
-          <h2>📈 Estadísticas Generales</h2>
-          <div class="stats-grid">
-            <div class="stat-card">
-              <div class="stat-label">Total Gastado</div>
-              <div class="stat-value">${formatearMoneda(estadisticas.totalGastos)}</div>
-            </div>
-            <div class="stat-card">
-              <div class="stat-label">Cantidad de Gastos</div>
-              <div class="stat-value">${estadisticas.cantidadGastos}</div>
-            </div>
-            <div class="stat-card">
-              <div class="stat-label">Promedio por Gasto</div>
-              <div class="stat-value">${formatearMoneda(estadisticas.promedioGasto)}</div>
-            </div>
-            <div class="stat-card">
-              <div class="stat-label">Gasto Mayor</div>
-              <div class="stat-value">${formatearMoneda(estadisticas.gastoMayor)}</div>
-            </div>
-            <div class="stat-card">
-              <div class="stat-label">Gasto Menor</div>
-              <div class="stat-value">${formatearMoneda(estadisticas.gastoMenor)}</div>
-            </div>
-            <div class="stat-card">
-              <div class="stat-label">Total Personas</div>
-              <div class="stat-value">${estadisticas.totalPersonas}</div>
-            </div>
-          </div>
-        </div>
-
-        <div class="section">
-          <h2>💰 Balance General</h2>
-          <table>
-            <thead>
-              <tr>
-                <th>Persona</th>
-                <th style="text-align: right;">Balance</th>
-                <th>Estado</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${balancesHTML}
-            </tbody>
-          </table>
-        </div>
-
-        <div class="section">
-          <h2>🧾 Detalle de Gastos</h2>
-          <table>
-            <thead>
-              <tr>
-                <th>Fecha</th>
-                <th>Descripción</th>
-                <th style="text-align: right;">Monto</th>
-                <th>Pagado por</th>
-                <th>Participantes</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${gastosHTML}
-            </tbody>
-          </table>
-        </div>
-
-        <div class="footer">
-          <p>Gestión de Gastos Compartidos - Reporte generado automáticamente</p>
-        </div>
-      </body>
-      </html>
-    `;
+  const obtenerMesActual = () => {
+    return new Date().toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
   };
 
   const generarPDF = async () => {
@@ -320,21 +85,48 @@ export default function ReportsScreen() {
 
     setLoading(true);
     try {
-      const html = generarHTML();
+      const html = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="UTF-8">
+          <style>
+            body { font-family: Arial, sans-serif; padding: 30px; }
+            .header { text-align: center; margin-bottom: 30px; }
+            h1 { color: ${PRIMARY_COLOR}; }
+            .stat { margin: 10px 0; }
+            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+            th, td { padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }
+            th { background-color: ${PRIMARY_COLOR}; color: white; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1>📊 Reporte Mensual</h1>
+            <p>${obtenerMesActual()}</p>
+          </div>
+          <div class="stat">Total Gastos: ${formatearMoneda(calcularTotalMes())}</div>
+          <div class="stat">Promedio/día: ${formatearMoneda(calcularPromedioDia())}</div>
+          <table>
+            <tr><th>Fecha</th><th>Descripción</th><th>Monto</th><th>Pagado por</th></tr>
+            ${gastos.map(g => `
+              <tr>
+                <td>${new Date(g.fecha).toLocaleDateString('es-ES')}</td>
+                <td>${g.descripcion}</td>
+                <td>${formatearMoneda(g.monto)}</td>
+                <td>${g.pagadoPor}</td>
+              </tr>
+            `).join('')}
+          </table>
+        </body>
+        </html>
+      `;
       
-      const { uri } = await Print.printToFileAsync({
-        html,
-        base64: false,
-      });
-
-      await shareAsync(uri, {
-        UTI: '.pdf',
-        mimeType: 'application/pdf',
-      });
-
+      const { uri } = await Print.printToFileAsync({ html });
+      await shareAsync(uri, { UTI: '.pdf', mimeType: 'application/pdf' });
+      
       Alert.alert('Éxito', 'Reporte PDF generado correctamente');
     } catch (error) {
-      console.error('Error al generar PDF:', error);
       Alert.alert('Error', 'No se pudo generar el reporte PDF');
     } finally {
       setLoading(false);
@@ -343,146 +135,94 @@ export default function ReportsScreen() {
 
   if (gastos.length === 0) {
     return (
-      <Layout backgroundColor={SECONDARY_COLOR} headerColor={PRIMARY_COLOR}>
-        <ScreenHeader
-          title="Reportes"
-          subtitle="Estadísticas y resúmenes"
-          backgroundColor={PRIMARY_COLOR}
-        />
-        <EmptyState
-          icon="bar-chart-outline"
-          title="No hay datos para reportar"
-          subtitle="Registra gastos para ver estadísticas y generar reportes"
-          iconColor="#CCC"
-        />
+      <Layout backgroundColor={BACKGROUND_COLOR} headerColor={PRIMARY_COLOR}>
+        <View style={styles.container}>
+          <View style={styles.header}>
+            <Text style={styles.headerTitle}>Reporte Mensual</Text>
+            <Text style={styles.headerSubtitle}>{obtenerMesActual()}</Text>
+          </View>
+          <View style={styles.emptyState}>
+            <Ionicons name="bar-chart-outline" size={80} color="#CBD5E1" />
+            <Text style={styles.emptyText}>No hay datos para reportar</Text>
+            <Text style={styles.emptySubtext}>Registra gastos para ver estadísticas</Text>
+          </View>
+        </View>
       </Layout>
     );
   }
 
+  const categorias = calcularGastosPorCategoria();
+  const totalCategorias = Object.values(categorias).reduce((a, b) => a + b, 0);
+
   return (
-    <Layout backgroundColor={SECONDARY_COLOR} headerColor={PRIMARY_COLOR}>
+    <Layout backgroundColor={BACKGROUND_COLOR} headerColor={PRIMARY_COLOR}>
       <ScrollView style={styles.container}>
-        <ScreenHeader
-          title="Reportes"
-          subtitle="Estadísticas y resúmenes"
-          backgroundColor={PRIMARY_COLOR}
-        />
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>Reporte Mensual</Text>
+          <Text style={styles.headerSubtitle}>{obtenerMesActual()}</Text>
+        </View>
 
         <View style={styles.content}>
+          {/* Totales */}
+          <View style={styles.statsRow}>
+            <View style={styles.statCard}>
+              <Text style={styles.statLabel}>Total Gastos</Text>
+              <Text style={styles.statValue}>{formatearMoneda(calcularTotalMes())}</Text>
+            </View>
+            <View style={styles.statCard}>
+              <Text style={styles.statLabel}>Promedio/día</Text>
+              <Text style={styles.statValue}>{formatearMoneda(calcularPromedioDia())}</Text>
+            </View>
+          </View>
+
+          {/* Gastos por Categoría */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>
-              <Ionicons name="stats-chart" size={20} /> Estadísticas Generales
-            </Text>
+            <Text style={styles.sectionTitle}>Gastos por Categoría</Text>
+            
+            {Object.entries(categorias).map(([categoria, monto]) => {
+              const porcentaje = totalCategorias > 0 ? (monto / totalCategorias) * 100 : 0;
+              let color = '#3B82F6';
+              if (categoria === 'Restaurantes') color = '#8B5CF6';
+              if (categoria === 'Transporte') color = '#F97316';
 
-            <View style={styles.statsGrid}>
-              <View style={styles.statCard}>
-                <Ionicons name="cash-outline" size={32} color="#27AE60" />
-                <Text style={styles.statValue}>
-                  {formatearMoneda(estadisticas.totalGastos)}
-                </Text>
-                <Text style={styles.statLabel}>Total Gastado</Text>
+              return monto > 0 ? (
+                <View key={categoria} style={styles.categoriaItem}>
+                  <View style={styles.categoriaHeader}>
+                    <Text style={styles.categoriaNombre}>{categoria}</Text>
+                    <Text style={styles.categoriaMonto}>{formatearMoneda(monto)}</Text>
+                  </View>
+                  <View style={styles.progressBar}>
+                    <View 
+                      style={[
+                        styles.progressFill, 
+                        { width: `${porcentaje}%`, backgroundColor: color }
+                      ]} 
+                    />
+                  </View>
+                </View>
+              ) : null;
+            })}
+          </View>
+
+          {/* Período del Reporte */}
+          <View style={styles.periodoCard}>
+            <View style={styles.periodoHeader}>
+              <Ionicons name="calendar" size={20} color="#64748B" />
+              <Text style={styles.periodoTitle}>Período del Reporte</Text>
+            </View>
+            <View style={styles.periodoRow}>
+              <View style={styles.periodoItem}>
+                <Text style={styles.periodoLabel}>01/10/2025</Text>
               </View>
-
-              <View style={styles.statCard}>
-                <Ionicons name="receipt-outline" size={32} color={PRIMARY_COLOR} />
-                <Text style={styles.statValue}>{estadisticas.cantidadGastos}</Text>
-                <Text style={styles.statLabel}>Cantidad de Gastos</Text>
-              </View>
-
-              <View style={styles.statCard}>
-                <Ionicons name="calculator-outline" size={32} color="#9B59B6" />
-                <Text style={styles.statValue}>
-                  {formatearMoneda(estadisticas.promedioGasto)}
-                </Text>
-                <Text style={styles.statLabel}>Promedio por Gasto</Text>
-              </View>
-
-              <View style={styles.statCard}>
-                <Ionicons name="trending-up" size={32} color="#E74C3C" />
-                <Text style={styles.statValue}>
-                  {formatearMoneda(estadisticas.gastoMayor)}
-                </Text>
-                <Text style={styles.statLabel}>Gasto Mayor</Text>
-              </View>
-
-              <View style={styles.statCard}>
-                <Ionicons name="trending-down" size={32} color="#3498DB" />
-                <Text style={styles.statValue}>
-                  {formatearMoneda(estadisticas.gastoMenor)}
-                </Text>
-                <Text style={styles.statLabel}>Gasto Menor</Text>
-              </View>
-
-              <View style={styles.statCard}>
-                <Ionicons name="people-outline" size={32} color="#E67E22" />
-                <Text style={styles.statValue}>{estadisticas.totalPersonas}</Text>
-                <Text style={styles.statLabel}>Total Personas</Text>
+              <View style={styles.periodoItem}>
+                <Text style={styles.periodoLabel}>17/10/2025</Text>
               </View>
             </View>
           </View>
 
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>
-              <Ionicons name="pie-chart" size={20} /> Resumen por Persona
-            </Text>
-            {(() => {
-              const gastoPorPersona: { [persona: string]: number } = {};
-              gastos.forEach(gasto => {
-                if (!gastoPorPersona[gasto.pagadoPor]) {
-                  gastoPorPersona[gasto.pagadoPor] = 0;
-                }
-                gastoPorPersona[gasto.pagadoPor] += gasto.monto;
-              });
-
-              return Object.entries(gastoPorPersona)
-                .sort(([, a], [, b]) => b - a)
-                .map(([persona, total]) => (
-                  <View key={persona} style={styles.personCard}>
-                    <View style={styles.personHeader}>
-                      <Ionicons name="person-circle" size={24} color={PRIMARY_COLOR} />
-                      <Text style={styles.personName}>{persona}</Text>
-                    </View>
-                    <View style={styles.personStats}>
-                      <Text style={[styles.personTotal, { color: PRIMARY_COLOR }]}>
-                        {formatearMoneda(total)}
-                      </Text>
-                      <Text style={styles.personLabel}>pagado</Text>
-                    </View>
-                  </View>
-                ));
-            })()}
-          </View>
-
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>
-              <Ionicons name="calendar" size={20} /> Gastos Recientes
-            </Text>
-            {gastos.slice(0, 5).map(gasto => (
-              <View key={gasto.id} style={styles.gastoCard}>
-                <View style={styles.gastoHeader}>
-                  <Text style={styles.gastoDescripcion}>{gasto.descripcion}</Text>
-                  <Text style={[styles.gastoMonto, { color: PRIMARY_COLOR }]}>
-                    {formatearMoneda(gasto.monto)}
-                  </Text>
-                </View>
-                <View style={styles.gastoFooter}>
-                  <Text style={styles.gastoFecha}>
-                    {formatearFecha(gasto.fecha)}
-                  </Text>
-                  <Text style={[styles.gastoPagador, { color: PRIMARY_COLOR }]}>
-                    Por: {gasto.pagadoPor}
-                  </Text>
-                </View>
-              </View>
-            ))}
-          </View>
-
+          {/* Botones de Acción */}
           <TouchableOpacity
-            style={[
-              styles.pdfButton,
-              { backgroundColor: PRIMARY_COLOR },
-              loading && styles.pdfButtonDisabled
-            ]}
+            style={[styles.pdfButton, loading && styles.pdfButtonDisabled]}
             onPress={generarPDF}
             disabled={loading}
           >
@@ -490,10 +230,14 @@ export default function ReportsScreen() {
               <ActivityIndicator color="#FFF" size="small" />
             ) : (
               <>
-                <Ionicons name="document-text" size={24} color="#FFF" />
-                <Text style={styles.pdfButtonText}>Generar PDF y Compartir</Text>
+                <Ionicons name="download" size={20} color="#FFF" />
+                <Text style={styles.pdfButtonText}>Generar PDF</Text>
               </>
             )}
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.shareButton}>
+            <Text style={styles.shareButtonText}>Compartir Reporte</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -505,143 +249,181 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  content: {
-    padding: 15,
+  header: {
+    backgroundColor: PRIMARY_COLOR,
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 30,
   },
-  section: {
-    marginBottom: 25,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 15,
-  },
-  statsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-  },
-  statCard: {
-    backgroundColor: '#FFF',
-    borderRadius: 12,
-    padding: 15,
-    width: '48%',
-    marginBottom: 12,
-    alignItems: 'center',
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
-  },
-  statValue: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#333',
-    marginTop: 8,
+  headerTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#FFF',
     marginBottom: 4,
   },
-  statLabel: {
-    fontSize: 12,
-    color: '#666',
-    textAlign: 'center',
-  },
-  personCard: {
-    backgroundColor: '#FFF',
-    borderRadius: 12,
-    padding: 15,
-    marginBottom: 10,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
-  },
-  personHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  personName: {
+  headerSubtitle: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-    marginLeft: 10,
+    color: 'rgba(255, 255, 255, 0.9)',
+    textTransform: 'capitalize',
   },
-  personStats: {
-    alignItems: 'flex-end',
+  emptyState: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingTop: 100,
   },
-  personTotal: {
+  emptyText: {
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: '600',
+    color: '#64748B',
+    marginTop: 16,
   },
-  personLabel: {
-    fontSize: 12,
-    color: '#999',
+  emptySubtext: {
+    fontSize: 14,
+    color: '#94A3B8',
+    marginTop: 8,
   },
-  gastoCard: {
+  content: {
+    padding: 20,
+  },
+  statsRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 24,
+  },
+  statCard: {
+    flex: 1,
     backgroundColor: '#FFF',
     borderRadius: 12,
-    padding: 15,
-    marginBottom: 10,
-    elevation: 2,
+    padding: 20,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
+    shadowOpacity: 0.05,
     shadowRadius: 2,
+    elevation: 1,
   },
-  gastoHeader: {
+  statLabel: {
+    fontSize: 13,
+    color: '#64748B',
+    marginBottom: 8,
+  },
+  statValue: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#1E293B',
+  },
+  section: {
+    marginBottom: 24,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1E293B',
+    marginBottom: 16,
+  },
+  categoriaItem: {
+    marginBottom: 20,
+  },
+  categoriaHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 8,
   },
-  gastoDescripcion: {
-    fontSize: 16,
+  categoriaNombre: {
+    fontSize: 14,
     fontWeight: '600',
-    color: '#333',
-    flex: 1,
+    color: '#475569',
   },
-  gastoMonto: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginLeft: 10,
+  categoriaMonto: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1E293B',
   },
-  gastoFooter: {
+  progressBar: {
+    height: 8,
+    backgroundColor: '#E2E8F0',
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    borderRadius: 4,
+  },
+  periodoCard: {
+    backgroundColor: '#FFF',
+    borderRadius: 12,
+    padding: 20,
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  periodoHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 16,
   },
-  gastoFecha: {
-    fontSize: 12,
-    color: '#999',
+  periodoTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#64748B',
   },
-  gastoPagador: {
-    fontSize: 12,
+  periodoRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  periodoItem: {
+    flex: 1,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 8,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  periodoLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#475569',
+    textAlign: 'center',
   },
   pdfButton: {
+    backgroundColor: PRIMARY_COLOR,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 8,
     padding: 18,
     borderRadius: 12,
-    marginTop: 10,
-    marginBottom: 30,
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
+    marginBottom: 12,
+    shadowColor: PRIMARY_COLOR,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
   },
   pdfButtonDisabled: {
     opacity: 0.6,
   },
   pdfButtonText: {
     color: '#FFF',
-    fontSize: 18,
-    fontWeight: '600',
-    marginLeft: 10,
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  shareButton: {
+    backgroundColor: '#FFF',
+    padding: 18,
+    borderRadius: 12,
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: PRIMARY_COLOR,
+  },
+  shareButtonText: {
+    color: PRIMARY_COLOR,
+    fontSize: 16,
+    fontWeight: '700',
   },
 });

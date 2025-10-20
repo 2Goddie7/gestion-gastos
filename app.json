@@ -26,10 +26,11 @@
         "backgroundColor": "#ffffff"
       },
       "permissions": [
-        "CAMERA",
-        "READ_EXTERNAL_STORAGE",
-        "WRITE_EXTERNAL_STORAGE",
-        "READ_MEDIA_IMAGES"
+        "android.permission.CAMERA",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.RECORD_AUDIO"
       ],
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false
@@ -45,6 +46,11 @@
           "cameraPermission": "La aplicación necesita acceso a la cámara para tomar fotos de recibos."
         }
       ]
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "30e6e73d-9718-4bb2-81c6-9ad647c5f7ce"
+      }
+    }
   }
 }
