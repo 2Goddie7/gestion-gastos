@@ -4,7 +4,7 @@ import { View, Text } from 'react-native';
 export default function ReciboScreen() {
   return (
     <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-      <Text>Lista de Gastos</Text>
+      <Text>RECIBOS</Text>
     </View>
   );
 }
