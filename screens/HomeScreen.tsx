@@ -18,6 +18,12 @@ import { agregarGasto, obtenerGastos } from '../storage/storage';
 import { Gasto } from '../types';
 import { Ionicons } from '@expo/vector-icons';
 import Layout from '../components/Layout';
+import ScreenHeader from '../components/ScreenHeader';
+import GastoCard from '../components/GastoCard';
+import EmptyState from '../components/EmptyState';
+
+const PRIMARY_COLOR = '#6C63FF';
+const ACCENT_COLOR = '#FF6B9D';
 
 export default function HomeScreen() {
   const [modalVisible, setModalVisible] = useState(false);
@@ -194,60 +200,27 @@ export default function HomeScreen() {
     setFotoRecibo(null);
   };
 
-  const formatearMoneda = (valor: number): string => {
-    return `$${valor.toFixed(2)}`;
-  };
-
-  const formatearFecha = (fecha: string): string => {
-    const date = new Date(fecha);
-    return date.toLocaleDateString('es-ES', {
-      day: '2-digit',
-      month: 'short',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  };
-
-  const renderGasto = ({ item }: { item: Gasto }) => (
-    <View style={styles.gastoCard}>
-      <Image source={{ uri: item.fotoRecibo }} style={styles.gastoThumbnail} />
-      <View style={styles.gastoInfo}>
-        <Text style={styles.gastoDescripcion} numberOfLines={1}>
-          {item.descripcion}
-        </Text>
-        <Text style={styles.gastoMonto}>{formatearMoneda(item.monto)}</Text>
-        <View style={styles.gastoMeta}>
-          <Ionicons name="person" size={12} color="#6C63FF" />
-          <Text style={styles.gastoMetaText}>{item.pagadoPor}</Text>
-          <Ionicons name="time-outline" size={12} color="#999" style={{ marginLeft: 8 }} />
-          <Text style={styles.gastoMetaText}>{formatearFecha(item.fecha)}</Text>
-        </View>
-      </View>
-    </View>
-  );
-
   return (
-    <Layout backgroundColor="#6C63FF">
+    <Layout backgroundColor={PRIMARY_COLOR} headerColor={PRIMARY_COLOR}>
       <View style={styles.container}>
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>💰 Mis Gastos</Text>
-          <Text style={styles.headerSubtitle}>
-            {gastos.length} gasto{gastos.length !== 1 ? 's' : ''} registrado{gastos.length !== 1 ? 's' : ''}
-          </Text>
-        </View>
+        <ScreenHeader
+          title="💰 Mis Gastos"
+          subtitle={`${gastos.length} gasto${gastos.length !== 1 ? 's' : ''} registrado${gastos.length !== 1 ? 's' : ''}`}
+          backgroundColor={PRIMARY_COLOR}
+        />
 
         {gastos.length === 0 ? (
-          <View style={styles.emptyState}>
-            <Ionicons name="wallet-outline" size={80} color="#B8B3FF" />
-            <Text style={styles.emptyText}>No hay gastos registrados</Text>
-            <Text style={styles.emptySubtext}>
-              Comienza agregando tu primer gasto
-            </Text>
-          </View>
+          <EmptyState
+            icon="wallet-outline"
+            title="No hay gastos registrados"
+            subtitle="Comienza agregando tu primer gasto"
+            iconColor="rgba(255, 255, 255, 0.5)"
+            backgroundColor={PRIMARY_COLOR}
+          />
         ) : (
           <FlatList
             data={gastos}
-            renderItem={renderGasto}
+            renderItem={({ item }) => <GastoCard gasto={item} accentColor={PRIMARY_COLOR} />}
             keyExtractor={(item) => item.id}
             contentContainerStyle={styles.listContent}
             showsVerticalScrollIndicator={false}
@@ -255,7 +228,7 @@ export default function HomeScreen() {
         )}
 
         <TouchableOpacity
-          style={styles.addButton}
+          style={[styles.addButton, { backgroundColor: ACCENT_COLOR }]}
           onPress={() => setModalVisible(true)}
         >
           <Ionicons name="add" size={32} color="#FFF" />
@@ -271,9 +244,9 @@ export default function HomeScreen() {
             <View style={styles.modalContainer}>
               <View style={styles.modalHeader}>
                 <TouchableOpacity onPress={() => setModalVisible(false)}>
-                  <Ionicons name="close" size={28} color="#6C63FF" />
+                  <Ionicons name="close" size={28} color={PRIMARY_COLOR} />
                 </TouchableOpacity>
-                <Text style={styles.modalTitle}>Nuevo Gasto</Text>
+                <Text style={[styles.modalTitle, { color: PRIMARY_COLOR }]}>Nuevo Gasto</Text>
                 <View style={{ width: 28 }} />
               </View>
 
@@ -325,8 +298,8 @@ export default function HomeScreen() {
                     <Image source={{ uri: fotoRecibo }} style={styles.photoPreview} />
                   ) : (
                     <View style={styles.photoPlaceholder}>
-                      <Ionicons name="camera" size={40} color="#6C63FF" />
-                      <Text style={styles.photoPlaceholderText}>
+                      <Ionicons name="camera" size={40} color={PRIMARY_COLOR} />
+                      <Text style={[styles.photoPlaceholderText, { color: PRIMARY_COLOR }]}>
                         Toca para agregar foto
                       </Text>
                     </View>
@@ -334,7 +307,11 @@ export default function HomeScreen() {
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                  style={[styles.saveButton, loading && styles.saveButtonDisabled]}
+                  style={[
+                    styles.saveButton, 
+                    { backgroundColor: PRIMARY_COLOR },
+                    loading && styles.saveButtonDisabled
+                  ]}
                   onPress={guardarGasto}
                   disabled={loading}
                 >
@@ -355,85 +332,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  header: {
-    backgroundColor: '#6C63FF',
-    padding: 20,
-    paddingBottom: 25,
-  },
-  headerTitle: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#FFF',
-    marginBottom: 5,
-  },
-  headerSubtitle: {
-    fontSize: 15,
-    color: '#E8E6FF',
-  },
-  emptyState: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  emptyText: {
-    fontSize: 20,
-    color: '#FFF',
-    marginTop: 20,
-    fontWeight: '600',
-  },
-  emptySubtext: {
-    fontSize: 16,
-    color: '#E8E6FF',
-    marginTop: 10,
-    textAlign: 'center',
-  },
   listContent: {
     padding: 15,
     paddingBottom: 100,
-  },
-  gastoCard: {
-    backgroundColor: '#FFF',
-    borderRadius: 16,
-    padding: 12,
-    marginBottom: 12,
-    flexDirection: 'row',
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-  },
-  gastoThumbnail: {
-    width: 70,
-    height: 70,
-    borderRadius: 12,
-    marginRight: 12,
-  },
-  gastoInfo: {
-    flex: 1,
-    justifyContent: 'center',
-  },
-  gastoDescripcion: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 6,
-  },
-  gastoMonto: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#6C63FF',
-    marginBottom: 4,
-  },
-  gastoMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  gastoMetaText: {
-    fontSize: 12,
-    color: '#666',
-    marginLeft: 4,
   },
   addButton: {
     position: 'absolute',
@@ -442,7 +343,6 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 30,
-    backgroundColor: '#FF6B9D',
     justifyContent: 'center',
     alignItems: 'center',
     elevation: 6,
@@ -465,7 +365,6 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 22,
     fontWeight: 'bold',
-    color: '#6C63FF',
   },
   modalContent: {
     flex: 1,
@@ -516,25 +415,23 @@ const styles = StyleSheet.create({
   },
   photoPlaceholderText: {
     marginTop: 10,
-    color: '#6C63FF',
     fontSize: 14,
     fontWeight: '500',
   },
   saveButton: {
-    backgroundColor: '#6C63FF',
     padding: 18,
     borderRadius: 12,
     alignItems: 'center',
     marginTop: 20,
     marginBottom: 40,
     elevation: 3,
-    shadowColor: '#6C63FF',
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
     shadowRadius: 4,
   },
   saveButtonDisabled: {
-    backgroundColor: '#B8B3FF',
+    opacity: 0.6,
   },
   saveButtonText: {
     color: '#FFF',

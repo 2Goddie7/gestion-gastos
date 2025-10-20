@@ -14,6 +14,12 @@ import { useFocusEffect } from '@react-navigation/native';
 import { obtenerGastos, eliminarGasto } from '../storage/storage';
 import { Gasto } from '../types';
 import { Ionicons } from '@expo/vector-icons';
+import Layout from '../components/Layout';
+import ScreenHeader from '../components/ScreenHeader';
+import EmptyState from '../components/EmptyState';
+
+const PRIMARY_COLOR = '#4ECDC4';
+const SECONDARY_COLOR = '#F5F7FA';
 
 export default function ReciboScreen() {
   const [gastos, setGastos] = useState<Gasto[]>([]);
@@ -25,7 +31,6 @@ export default function ReciboScreen() {
   const cargarGastos = async () => {
     try {
       const gastosObtenidos = await obtenerGastos();
-      // Ordenar por fecha más reciente
       const gastosOrdenados = gastosObtenidos.sort(
         (a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime()
       );
@@ -112,7 +117,9 @@ export default function ReciboScreen() {
         <Text style={styles.descripcion} numberOfLines={1}>
           {item.descripcion}
         </Text>
-        <Text style={styles.monto}>{formatearMoneda(item.monto)}</Text>
+        <Text style={[styles.monto, { color: PRIMARY_COLOR }]}>
+          {formatearMoneda(item.monto)}
+        </Text>
         <Text style={styles.fecha}>{formatearFecha(item.fecha)}</Text>
         <View style={styles.participantesContainer}>
           <Ionicons name="people" size={14} color="#666" />
@@ -124,7 +131,7 @@ export default function ReciboScreen() {
 
       <View style={styles.pagadorContainer}>
         <Text style={styles.pagadorLabel}>Pagó:</Text>
-        <Text style={styles.pagador} numberOfLines={1}>
+        <Text style={[styles.pagador, { color: PRIMARY_COLOR }]} numberOfLines={1}>
           {item.pagadoPor}
         </Text>
       </View>
@@ -135,199 +142,172 @@ export default function ReciboScreen() {
 
   if (gastos.length === 0) {
     return (
-      <View style={styles.emptyContainer}>
-        <Ionicons name="receipt-outline" size={80} color="#CCC" />
-        <Text style={styles.emptyText}>No hay recibos registrados</Text>
-        <Text style={styles.emptySubtext}>
-          Los gastos que registres aparecerán aquí
-        </Text>
-      </View>
+      <Layout backgroundColor={SECONDARY_COLOR} headerColor={PRIMARY_COLOR}>
+        <ScreenHeader
+          title="Recibos"
+          subtitle="Gestiona tus comprobantes"
+          backgroundColor={PRIMARY_COLOR}
+        />
+        <EmptyState
+          icon="receipt-outline"
+          title="No hay recibos registrados"
+          subtitle="Los gastos que registres aparecerán aquí"
+          iconColor="#CCC"
+        />
+      </Layout>
     );
   }
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Recibos</Text>
-        <Text style={styles.headerSubtitle}>
-          {gastos.length} recibo{gastos.length !== 1 ? 's' : ''} registrado{gastos.length !== 1 ? 's' : ''}
-        </Text>
-      </View>
+    <Layout backgroundColor={SECONDARY_COLOR} headerColor={PRIMARY_COLOR}>
+      <View style={styles.container}>
+        <ScreenHeader
+          title="Recibos"
+          subtitle={`${gastos.length} recibo${gastos.length !== 1 ? 's' : ''} registrado${gastos.length !== 1 ? 's' : ''}`}
+          backgroundColor={PRIMARY_COLOR}
+        />
 
-      <FlatList
-        data={gastos}
-        renderItem={renderGasto}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.listContent}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }
-      />
+        <FlatList
+          data={gastos}
+          renderItem={renderGasto}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.listContent}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
+        />
 
-      {/* Modal de Detalle */}
-      <Modal
-        animationType="slide"
-        transparent={false}
-        visible={modalVisible}
-        onRequestClose={() => setModalVisible(false)}
-      >
-        {selectedGasto && (
-          <View style={styles.modalContainer}>
-            <View style={styles.modalHeader}>
-              <TouchableOpacity onPress={() => setModalVisible(false)}>
-                <Ionicons name="close" size={28} color="#333" />
-              </TouchableOpacity>
-              <Text style={styles.modalTitle}>Detalle del Gasto</Text>
-              <TouchableOpacity onPress={confirmarEliminar}>
-                <Ionicons name="trash-outline" size={28} color="#E74C3C" />
-              </TouchableOpacity>
-            </View>
+        {/* Modal de Detalle */}
+        <Modal
+          animationType="slide"
+          transparent={false}
+          visible={modalVisible}
+          onRequestClose={() => setModalVisible(false)}
+        >
+          {selectedGasto && (
+            <View style={styles.modalContainer}>
+              <View style={styles.modalHeader}>
+                <TouchableOpacity onPress={() => setModalVisible(false)}>
+                  <Ionicons name="close" size={28} color="#333" />
+                </TouchableOpacity>
+                <Text style={styles.modalTitle}>Detalle del Gasto</Text>
+                <TouchableOpacity onPress={confirmarEliminar}>
+                  <Ionicons name="trash-outline" size={28} color="#E74C3C" />
+                </TouchableOpacity>
+              </View>
 
-            <View style={styles.modalContent}>
-              <TouchableOpacity
-                onPress={verImagenCompleta}
-                activeOpacity={0.8}
-              >
-                <Image
-                  source={{ uri: selectedGasto.fotoRecibo }}
-                  style={styles.reciboImage}
-                />
-                <View style={styles.imageOverlay}>
-                  <Ionicons name="expand" size={30} color="#FFF" />
-                  <Text style={styles.imageOverlayText}>Toca para ampliar</Text>
-                </View>
-              </TouchableOpacity>
-
-              <View style={styles.detalleSection}>
-                <View style={styles.detalleRow}>
-                  <Ionicons name="document-text" size={24} color="#4A90E2" />
-                  <View style={styles.detalleContent}>
-                    <Text style={styles.detalleLabel}>Descripción</Text>
-                    <Text style={styles.detalleValue}>{selectedGasto.descripcion}</Text>
+              <View style={styles.modalContent}>
+                <TouchableOpacity
+                  onPress={verImagenCompleta}
+                  activeOpacity={0.8}
+                >
+                  <Image
+                    source={{ uri: selectedGasto.fotoRecibo }}
+                    style={styles.reciboImage}
+                  />
+                  <View style={styles.imageOverlay}>
+                    <Ionicons name="expand" size={30} color="#FFF" />
+                    <Text style={styles.imageOverlayText}>Toca para ampliar</Text>
                   </View>
-                </View>
+                </TouchableOpacity>
 
-                <View style={styles.detalleRow}>
-                  <Ionicons name="cash" size={24} color="#27AE60" />
-                  <View style={styles.detalleContent}>
-                    <Text style={styles.detalleLabel}>Monto Total</Text>
-                    <Text style={styles.detalleValueBold}>
-                      {formatearMoneda(selectedGasto.monto)}
-                    </Text>
+                <View style={styles.detalleSection}>
+                  <View style={styles.detalleRow}>
+                    <Ionicons name="document-text" size={24} color={PRIMARY_COLOR} />
+                    <View style={styles.detalleContent}>
+                      <Text style={styles.detalleLabel}>Descripción</Text>
+                      <Text style={styles.detalleValue}>{selectedGasto.descripcion}</Text>
+                    </View>
                   </View>
-                </View>
 
-                <View style={styles.detalleRow}>
-                  <Ionicons name="person" size={24} color="#9B59B6" />
-                  <View style={styles.detalleContent}>
-                    <Text style={styles.detalleLabel}>Pagado por</Text>
-                    <Text style={styles.detalleValue}>{selectedGasto.pagadoPor}</Text>
+                  <View style={styles.detalleRow}>
+                    <Ionicons name="cash" size={24} color="#27AE60" />
+                    <View style={styles.detalleContent}>
+                      <Text style={styles.detalleLabel}>Monto Total</Text>
+                      <Text style={styles.detalleValueBold}>
+                        {formatearMoneda(selectedGasto.monto)}
+                      </Text>
+                    </View>
                   </View>
-                </View>
 
-                <View style={styles.detalleRow}>
-                  <Ionicons name="people" size={24} color="#E67E22" />
-                  <View style={styles.detalleContent}>
-                    <Text style={styles.detalleLabel}>Participantes</Text>
-                    <Text style={styles.detalleValue}>
-                      {selectedGasto.participantes.join(', ')}
-                    </Text>
+                  <View style={styles.detalleRow}>
+                    <Ionicons name="person" size={24} color="#9B59B6" />
+                    <View style={styles.detalleContent}>
+                      <Text style={styles.detalleLabel}>Pagado por</Text>
+                      <Text style={styles.detalleValue}>{selectedGasto.pagadoPor}</Text>
+                    </View>
                   </View>
-                </View>
 
-                <View style={styles.detalleRow}>
-                  <Ionicons name="calculator" size={24} color="#34495E" />
-                  <View style={styles.detalleContent}>
-                    <Text style={styles.detalleLabel}>Costo por persona</Text>
-                    <Text style={styles.detalleValueBold}>
-                      {formatearMoneda(selectedGasto.monto / selectedGasto.participantes.length)}
-                    </Text>
+                  <View style={styles.detalleRow}>
+                    <Ionicons name="people" size={24} color="#E67E22" />
+                    <View style={styles.detalleContent}>
+                      <Text style={styles.detalleLabel}>Participantes</Text>
+                      <Text style={styles.detalleValue}>
+                        {selectedGasto.participantes.join(', ')}
+                      </Text>
+                    </View>
                   </View>
-                </View>
 
-                <View style={styles.detalleRow}>
-                  <Ionicons name="calendar" size={24} color="#95A5A6" />
-                  <View style={styles.detalleContent}>
-                    <Text style={styles.detalleLabel}>Fecha</Text>
-                    <Text style={styles.detalleValue}>
-                      {formatearFecha(selectedGasto.fecha)}
-                    </Text>
+                  <View style={styles.detalleRow}>
+                    <Ionicons name="calculator" size={24} color="#34495E" />
+                    <View style={styles.detalleContent}>
+                      <Text style={styles.detalleLabel}>Costo por persona</Text>
+                      <Text style={styles.detalleValueBold}>
+                        {formatearMoneda(selectedGasto.monto / selectedGasto.participantes.length)}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.detalleRow}>
+                    <Ionicons name="calendar" size={24} color="#95A5A6" />
+                    <View style={styles.detalleContent}>
+                      <Text style={styles.detalleLabel}>Fecha</Text>
+                      <Text style={styles.detalleValue}>
+                        {formatearFecha(selectedGasto.fecha)}
+                      </Text>
+                    </View>
                   </View>
                 </View>
               </View>
             </View>
-          </View>
-        )}
-      </Modal>
-
-      {/* Modal de Imagen Completa */}
-      <Modal
-        animationType="fade"
-        transparent={true}
-        visible={imageModalVisible}
-        onRequestClose={() => setImageModalVisible(false)}
-      >
-        <View style={styles.imageModalContainer}>
-          <TouchableOpacity
-            style={styles.closeImageButton}
-            onPress={() => setImageModalVisible(false)}
-          >
-            <Ionicons name="close-circle" size={40} color="#FFF" />
-          </TouchableOpacity>
-          {selectedGasto && (
-            <Image
-              source={{ uri: selectedGasto.fotoRecibo }}
-              style={styles.fullImage}
-              resizeMode="contain"
-            />
           )}
-        </View>
-      </Modal>
-    </View>
+        </Modal>
+
+        {/* Modal de Imagen Completa */}
+        <Modal
+          animationType="fade"
+          transparent={true}
+          visible={imageModalVisible}
+          onRequestClose={() => setImageModalVisible(false)}
+        >
+          <View style={styles.imageModalContainer}>
+            <TouchableOpacity
+              style={styles.closeImageButton}
+              onPress={() => setImageModalVisible(false)}
+            >
+              <Ionicons name="close-circle" size={40} color="#FFF" />
+            </TouchableOpacity>
+            {selectedGasto && (
+              <Image
+                source={{ uri: selectedGasto.fotoRecibo }}
+                style={styles.fullImage}
+                resizeMode="contain"
+              />
+            )}
+          </View>
+        </Modal>
+      </View>
+    </Layout>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F7FA',
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-    backgroundColor: '#F5F7FA',
-  },
-  emptyText: {
-    fontSize: 20,
-    color: '#999',
-    marginTop: 20,
-    fontWeight: '600',
-  },
-  emptySubtext: {
-    fontSize: 16,
-    color: '#BBB',
-    marginTop: 10,
-    textAlign: 'center',
-  },
-  header: {
-    backgroundColor: '#4A90E2',
-    padding: 20,
-    paddingTop: 60,
-  },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#FFF',
-    marginBottom: 5,
-  },
-  headerSubtitle: {
-    fontSize: 16,
-    color: '#E3F2FD',
   },
   listContent: {
     padding: 15,
+    paddingBottom: 20,
   },
   gastoCard: {
     backgroundColor: '#FFF',
@@ -360,7 +340,6 @@ const styles = StyleSheet.create({
   monto: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#27AE60',
     marginBottom: 2,
   },
   fecha: {
@@ -388,7 +367,6 @@ const styles = StyleSheet.create({
   },
   pagador: {
     fontSize: 13,
-    color: '#4A90E2',
     fontWeight: '600',
     maxWidth: 80,
   },

@@ -1,21 +1,37 @@
 import React from 'react';
-import { SafeAreaView, StyleSheet, ViewStyle } from 'react-native';
+import { SafeAreaView, StyleSheet, View, StatusBar } from 'react-native';
 
 interface LayoutProps {
   children: React.ReactNode;
   backgroundColor?: string;
+  headerColor?: string;
 }
 
-export default function Layout({ children, backgroundColor = '#F5F7FA' }: LayoutProps) {
+export default function Layout({ 
+  children, 
+  backgroundColor = '#F5F7FA',
+  headerColor
+}: LayoutProps) {
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor }]}>
-      {children}
-    </SafeAreaView>
+    <>
+      <StatusBar 
+        barStyle="light-content" 
+        backgroundColor={headerColor || backgroundColor} 
+      />
+      <SafeAreaView style={[styles.container, { backgroundColor }]}>
+        <View style={styles.content}>
+          {children}
+        </View>
+      </SafeAreaView>
+    </>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
+    flex: 1,
+  },
+  content: {
     flex: 1,
   },
 });

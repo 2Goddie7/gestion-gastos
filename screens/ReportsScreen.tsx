@@ -14,6 +14,12 @@ import { Gasto } from '../types';
 import { Ionicons } from '@expo/vector-icons';
 import * as Print from 'expo-print';
 import { shareAsync } from 'expo-sharing';
+import Layout from '../components/Layout';
+import ScreenHeader from '../components/ScreenHeader';
+import EmptyState from '../components/EmptyState';
+
+const PRIMARY_COLOR = '#FFA500';
+const SECONDARY_COLOR = '#F5F7FA';
 
 export default function ReportsScreen() {
   const [gastos, setGastos] = useState<Gasto[]>([]);
@@ -97,7 +103,6 @@ export default function ReportsScreen() {
       minute: '2-digit',
     });
 
-    // Calcular balances
     const balanceMap: { [persona: string]: number } = {};
     gastos.forEach(gasto => {
       const costoPorPersona = gasto.monto / gasto.participantes.length;
@@ -163,12 +168,12 @@ export default function ReportsScreen() {
           }
           .header {
             text-align: center;
-            border-bottom: 3px solid #4A90E2;
+            border-bottom: 3px solid ${PRIMARY_COLOR};
             padding-bottom: 20px;
             margin-bottom: 30px;
           }
           .header h1 {
-            color: #4A90E2;
+            color: ${PRIMARY_COLOR};
             margin: 0 0 10px 0;
           }
           .header p {
@@ -213,7 +218,7 @@ export default function ReportsScreen() {
             margin-top: 15px;
           }
           th {
-            background-color: #4A90E2;
+            background-color: ${PRIMARY_COLOR};
             color: white;
             padding: 12px;
             text-align: left;
@@ -317,13 +322,11 @@ export default function ReportsScreen() {
     try {
       const html = generarHTML();
       
-      // Generar el PDF
       const { uri } = await Print.printToFileAsync({
         html,
         base64: false,
       });
 
-      // Compartir el PDF
       await shareAsync(uri, {
         UTI: '.pdf',
         mimeType: 'application/pdf',
@@ -340,188 +343,167 @@ export default function ReportsScreen() {
 
   if (gastos.length === 0) {
     return (
-      <View style={styles.emptyContainer}>
-        <Ionicons name="bar-chart-outline" size={80} color="#CCC" />
-        <Text style={styles.emptyText}>No hay datos para reportar</Text>
-        <Text style={styles.emptySubtext}>
-          Registra gastos para ver estadísticas y generar reportes
-        </Text>
-      </View>
+      <Layout backgroundColor={SECONDARY_COLOR} headerColor={PRIMARY_COLOR}>
+        <ScreenHeader
+          title="Reportes"
+          subtitle="Estadísticas y resúmenes"
+          backgroundColor={PRIMARY_COLOR}
+        />
+        <EmptyState
+          icon="bar-chart-outline"
+          title="No hay datos para reportar"
+          subtitle="Registra gastos para ver estadísticas y generar reportes"
+          iconColor="#CCC"
+        />
+      </Layout>
     );
   }
 
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Reportes</Text>
-        <Text style={styles.headerSubtitle}>Estadísticas y resúmenes</Text>
-      </View>
+    <Layout backgroundColor={SECONDARY_COLOR} headerColor={PRIMARY_COLOR}>
+      <ScrollView style={styles.container}>
+        <ScreenHeader
+          title="Reportes"
+          subtitle="Estadísticas y resúmenes"
+          backgroundColor={PRIMARY_COLOR}
+        />
 
-      <View style={styles.content}>
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>
-            <Ionicons name="stats-chart" size={20} /> Estadísticas Generales
-          </Text>
+        <View style={styles.content}>
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>
+              <Ionicons name="stats-chart" size={20} /> Estadísticas Generales
+            </Text>
 
-          <View style={styles.statsGrid}>
-            <View style={styles.statCard}>
-              <Ionicons name="cash-outline" size={32} color="#27AE60" />
-              <Text style={styles.statValue}>
-                {formatearMoneda(estadisticas.totalGastos)}
-              </Text>
-              <Text style={styles.statLabel}>Total Gastado</Text>
-            </View>
+            <View style={styles.statsGrid}>
+              <View style={styles.statCard}>
+                <Ionicons name="cash-outline" size={32} color="#27AE60" />
+                <Text style={styles.statValue}>
+                  {formatearMoneda(estadisticas.totalGastos)}
+                </Text>
+                <Text style={styles.statLabel}>Total Gastado</Text>
+              </View>
 
-            <View style={styles.statCard}>
-              <Ionicons name="receipt-outline" size={32} color="#4A90E2" />
-              <Text style={styles.statValue}>{estadisticas.cantidadGastos}</Text>
-              <Text style={styles.statLabel}>Cantidad de Gastos</Text>
-            </View>
+              <View style={styles.statCard}>
+                <Ionicons name="receipt-outline" size={32} color={PRIMARY_COLOR} />
+                <Text style={styles.statValue}>{estadisticas.cantidadGastos}</Text>
+                <Text style={styles.statLabel}>Cantidad de Gastos</Text>
+              </View>
 
-            <View style={styles.statCard}>
-              <Ionicons name="calculator-outline" size={32} color="#9B59B6" />
-              <Text style={styles.statValue}>
-                {formatearMoneda(estadisticas.promedioGasto)}
-              </Text>
-              <Text style={styles.statLabel}>Promedio por Gasto</Text>
-            </View>
+              <View style={styles.statCard}>
+                <Ionicons name="calculator-outline" size={32} color="#9B59B6" />
+                <Text style={styles.statValue}>
+                  {formatearMoneda(estadisticas.promedioGasto)}
+                </Text>
+                <Text style={styles.statLabel}>Promedio por Gasto</Text>
+              </View>
 
-            <View style={styles.statCard}>
-              <Ionicons name="trending-up" size={32} color="#E74C3C" />
-              <Text style={styles.statValue}>
-                {formatearMoneda(estadisticas.gastoMayor)}
-              </Text>
-              <Text style={styles.statLabel}>Gasto Mayor</Text>
-            </View>
+              <View style={styles.statCard}>
+                <Ionicons name="trending-up" size={32} color="#E74C3C" />
+                <Text style={styles.statValue}>
+                  {formatearMoneda(estadisticas.gastoMayor)}
+                </Text>
+                <Text style={styles.statLabel}>Gasto Mayor</Text>
+              </View>
 
-            <View style={styles.statCard}>
-              <Ionicons name="trending-down" size={32} color="#3498DB" />
-              <Text style={styles.statValue}>
-                {formatearMoneda(estadisticas.gastoMenor)}
-              </Text>
-              <Text style={styles.statLabel}>Gasto Menor</Text>
-            </View>
+              <View style={styles.statCard}>
+                <Ionicons name="trending-down" size={32} color="#3498DB" />
+                <Text style={styles.statValue}>
+                  {formatearMoneda(estadisticas.gastoMenor)}
+                </Text>
+                <Text style={styles.statLabel}>Gasto Menor</Text>
+              </View>
 
-            <View style={styles.statCard}>
-              <Ionicons name="people-outline" size={32} color="#E67E22" />
-              <Text style={styles.statValue}>{estadisticas.totalPersonas}</Text>
-              <Text style={styles.statLabel}>Total Personas</Text>
+              <View style={styles.statCard}>
+                <Ionicons name="people-outline" size={32} color="#E67E22" />
+                <Text style={styles.statValue}>{estadisticas.totalPersonas}</Text>
+                <Text style={styles.statLabel}>Total Personas</Text>
+              </View>
             </View>
           </View>
-        </View>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>
-            <Ionicons name="pie-chart" size={20} /> Resumen por Persona
-          </Text>
-          {(() => {
-            const gastoPorPersona: { [persona: string]: number } = {};
-            gastos.forEach(gasto => {
-              if (!gastoPorPersona[gasto.pagadoPor]) {
-                gastoPorPersona[gasto.pagadoPor] = 0;
-              }
-              gastoPorPersona[gasto.pagadoPor] += gasto.monto;
-            });
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>
+              <Ionicons name="pie-chart" size={20} /> Resumen por Persona
+            </Text>
+            {(() => {
+              const gastoPorPersona: { [persona: string]: number } = {};
+              gastos.forEach(gasto => {
+                if (!gastoPorPersona[gasto.pagadoPor]) {
+                  gastoPorPersona[gasto.pagadoPor] = 0;
+                }
+                gastoPorPersona[gasto.pagadoPor] += gasto.monto;
+              });
 
-            return Object.entries(gastoPorPersona)
-              .sort(([, a], [, b]) => b - a)
-              .map(([persona, total]) => (
-                <View key={persona} style={styles.personCard}>
-                  <View style={styles.personHeader}>
-                    <Ionicons name="person-circle" size={24} color="#4A90E2" />
-                    <Text style={styles.personName}>{persona}</Text>
+              return Object.entries(gastoPorPersona)
+                .sort(([, a], [, b]) => b - a)
+                .map(([persona, total]) => (
+                  <View key={persona} style={styles.personCard}>
+                    <View style={styles.personHeader}>
+                      <Ionicons name="person-circle" size={24} color={PRIMARY_COLOR} />
+                      <Text style={styles.personName}>{persona}</Text>
+                    </View>
+                    <View style={styles.personStats}>
+                      <Text style={[styles.personTotal, { color: PRIMARY_COLOR }]}>
+                        {formatearMoneda(total)}
+                      </Text>
+                      <Text style={styles.personLabel}>pagado</Text>
+                    </View>
                   </View>
-                  <View style={styles.personStats}>
-                    <Text style={styles.personTotal}>
-                      {formatearMoneda(total)}
-                    </Text>
-                    <Text style={styles.personLabel}>pagado</Text>
-                  </View>
+                ));
+            })()}
+          </View>
+
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>
+              <Ionicons name="calendar" size={20} /> Gastos Recientes
+            </Text>
+            {gastos.slice(0, 5).map(gasto => (
+              <View key={gasto.id} style={styles.gastoCard}>
+                <View style={styles.gastoHeader}>
+                  <Text style={styles.gastoDescripcion}>{gasto.descripcion}</Text>
+                  <Text style={[styles.gastoMonto, { color: PRIMARY_COLOR }]}>
+                    {formatearMoneda(gasto.monto)}
+                  </Text>
                 </View>
-              ));
-          })()}
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>
-            <Ionicons name="calendar" size={20} /> Gastos Recientes
-          </Text>
-          {gastos.slice(0, 5).map(gasto => (
-            <View key={gasto.id} style={styles.gastoCard}>
-              <View style={styles.gastoHeader}>
-                <Text style={styles.gastoDescripcion}>{gasto.descripcion}</Text>
-                <Text style={styles.gastoMonto}>
-                  {formatearMoneda(gasto.monto)}
-                </Text>
+                <View style={styles.gastoFooter}>
+                  <Text style={styles.gastoFecha}>
+                    {formatearFecha(gasto.fecha)}
+                  </Text>
+                  <Text style={[styles.gastoPagador, { color: PRIMARY_COLOR }]}>
+                    Por: {gasto.pagadoPor}
+                  </Text>
+                </View>
               </View>
-              <View style={styles.gastoFooter}>
-                <Text style={styles.gastoFecha}>
-                  {formatearFecha(gasto.fecha)}
-                </Text>
-                <Text style={styles.gastoPagador}>Por: {gasto.pagadoPor}</Text>
-              </View>
-            </View>
-          ))}
-        </View>
+            ))}
+          </View>
 
-        <TouchableOpacity
-          style={[styles.pdfButton, loading && styles.pdfButtonDisabled]}
-          onPress={generarPDF}
-          disabled={loading}
-        >
-          {loading ? (
-            <ActivityIndicator color="#FFF" size="small" />
-          ) : (
-            <>
-              <Ionicons name="document-text" size={24} color="#FFF" />
-              <Text style={styles.pdfButtonText}>Generar PDF y Compartir</Text>
-            </>
-          )}
-        </TouchableOpacity>
-      </View>
-    </ScrollView>
+          <TouchableOpacity
+            style={[
+              styles.pdfButton,
+              { backgroundColor: PRIMARY_COLOR },
+              loading && styles.pdfButtonDisabled
+            ]}
+            onPress={generarPDF}
+            disabled={loading}
+          >
+            {loading ? (
+              <ActivityIndicator color="#FFF" size="small" />
+            ) : (
+              <>
+                <Ionicons name="document-text" size={24} color="#FFF" />
+                <Text style={styles.pdfButtonText}>Generar PDF y Compartir</Text>
+              </>
+            )}
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+    </Layout>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F7FA',
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-    backgroundColor: '#F5F7FA',
-  },
-  emptyText: {
-    fontSize: 20,
-    color: '#999',
-    marginTop: 20,
-    fontWeight: '600',
-  },
-  emptySubtext: {
-    fontSize: 16,
-    color: '#BBB',
-    marginTop: 10,
-    textAlign: 'center',
-  },
-  header: {
-    backgroundColor: '#4A90E2',
-    padding: 20,
-    paddingTop: 60,
-    paddingBottom: 30,
-  },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#FFF',
-    marginBottom: 5,
-  },
-  headerSubtitle: {
-    fontSize: 16,
-    color: '#E3F2FD',
   },
   content: {
     padding: 15,
@@ -595,7 +577,6 @@ const styles = StyleSheet.create({
   personTotal: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#27AE60',
   },
   personLabel: {
     fontSize: 12,
@@ -627,7 +608,6 @@ const styles = StyleSheet.create({
   gastoMonto: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#27AE60',
     marginLeft: 10,
   },
   gastoFooter: {
@@ -640,10 +620,8 @@ const styles = StyleSheet.create({
   },
   gastoPagador: {
     fontSize: 12,
-    color: '#4A90E2',
   },
   pdfButton: {
-    backgroundColor: '#E74C3C',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -658,7 +636,7 @@ const styles = StyleSheet.create({
     shadowRadius: 3.84,
   },
   pdfButtonDisabled: {
-    backgroundColor: '#ECBCBC',
+    opacity: 0.6,
   },
   pdfButtonText: {
     color: '#FFF',

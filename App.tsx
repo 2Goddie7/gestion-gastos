@@ -9,6 +9,13 @@ import { Ionicons } from '@expo/vector-icons';
 
 const Tab = createBottomTabNavigator();
 
+const TAB_COLORS = {
+  Inicio: '#6C63FF',
+  Balance: '#FF6B9D',
+  Recibos: '#4ECDC4',
+  Reporte: '#FFA500',
+};
+
 export default function App() {
   return (
     <NavigationContainer>
@@ -31,13 +38,25 @@ export default function App() {
 
             return <Ionicons name={iconName} size={size} color={color} />;
           },
-          tabBarActiveTintColor: '#4A90E2',
+          tabBarActiveTintColor: TAB_COLORS[route.name as keyof typeof TAB_COLORS],
           tabBarInactiveTintColor: '#999',
           headerShown: false,
           tabBarStyle: {
-            height: 60,
-            paddingBottom: 8,
+            height: 65,
+            paddingBottom: 10,
             paddingTop: 8,
+            backgroundColor: '#FFF',
+            borderTopWidth: 1,
+            borderTopColor: '#E0E0E0',
+            elevation: 8,
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: -2 },
+            shadowOpacity: 0.1,
+            shadowRadius: 3,
+          },
+          tabBarLabelStyle: {
+            fontSize: 12,
+            fontWeight: '600',
           },
         })}
       >
